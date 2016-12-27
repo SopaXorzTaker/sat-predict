@@ -127,7 +127,7 @@ class Satellite(object):
             (angular_momentum / radius) * (cos_asc * sin_arg_tru + sin_asc * cos_arg_tru * cos_inc),
             ((coords[1] * angular_momentum * self.eccentricity) / (radius * orbital_period)) * sin_tru -
             (angular_momentum / radius) * (sin_asc * sin_arg_tru + cos_asc * cos_arg_tru * cos_inc),
-            ((coords[2] * angular_momentum * self.eccentricity) / (radius * orbital_period)) * sin_tru -
+            ((coords[2] * angular_momentum * self.eccentricity) / (radius * orbital_period)) * sin_tru +
             (angular_momentum / radius) * (sin_inc * cos_arg_tru)
         )
 
