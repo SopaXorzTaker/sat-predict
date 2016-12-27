@@ -103,7 +103,8 @@ class Satellite(object):
                                       math.sqrt(1 - self.eccentricity) * math.cos(
                                           eccentric_anomaly * DEG_TO_RAD / 2)) * RAD_TO_DEG
 
-        radius = (semi_major_axis * (1 - self.eccentricity**2)) / (1 + self.eccentricity * math.cos(true_anomaly))
+        radius = (semi_major_axis * (1 - self.eccentricity**2)) /\
+                 (1 + self.eccentricity * math.cos(true_anomaly * DEG_TO_RAD))
 
         semi_minor_axis = semi_major_axis * math.sqrt((1 - self.eccentricity) ** 2)
         angular_momentum = math.pi * 2 * semi_major_axis * semi_minor_axis / orbital_period
