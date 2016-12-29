@@ -10,7 +10,7 @@ EARTH_MU = 3.986004418e14
 EARTH_ROTATION = 7.2921158553e-5
 DEG_TO_RAD = math.pi / 180
 RAD_TO_DEG = 180 / math.pi
-MIN_PRECISION = 1e-5
+MIN_PRECISION = 1e-3
 
 
 def tle_to_params(line1, line2):
@@ -68,9 +68,6 @@ def ecef_to_coords(x, y, z):
 def find_eccentric_anomaly(mean_anomaly, eccentricity):
     eccentric_anomaly = mean_anomaly
 
-    if eccentricity > 0.5:
-        eccentric_anomaly = math.pi * 2
-
     while abs(mean_anomaly - (eccentric_anomaly - eccentricity * math.sin(eccentric_anomaly))) > MIN_PRECISION:
         eccentric_anomaly -= (eccentric_anomaly - (mean_anomaly + eccentricity * math.sin(eccentric_anomaly))) / \
                              (1 - eccentricity * math.cos(eccentric_anomaly))
@@ -106,8 +103,7 @@ class Satellite(object):
         radius = (semi_major_axis * (1 - self.eccentricity**2)) /\
                  (1 + self.eccentricity * math.cos(true_anomaly * DEG_TO_RAD))
 
-        semi_minor_axis = semi_major_axis * math.sqrt((1 - self.eccentricity) ** 2)
-        angular_momentum = math.pi * 2 * semi_major_axis * semi_minor_axis / orbital_period
+        angular_momentum = math.sqrt(EARTH_MU * semi_major_axis * (1 - self.eccentricity**2))
 
         cos_arg_tru, sin_arg_tru = math.cos(self.argument_of_perigee * DEG_TO_RAD + true_anomaly * DEG_TO_RAD), \
             math.sin(self.argument_of_perigee * DEG_TO_RAD + true_anomaly * DEG_TO_RAD)
@@ -117,8 +113,8 @@ class Satellite(object):
         cos_tru, sin_tru = math.cos(true_anomaly * DEG_TO_RAD), math.sin(true_anomaly * DEG_TO_RAD)
 
         coords = (
-            radius * (cos_asc * cos_arg_tru - sin_asc * sin_arg_tru * sin_inc),
-            radius * (sin_asc * cos_arg_tru - cos_asc * sin_arg_tru * sin_inc),
+            radius * (cos_asc * cos_arg_tru - sin_asc * sin_arg_tru * cos_inc),
+            radius * (sin_asc * cos_arg_tru + cos_asc * sin_arg_tru * cos_inc),
             radius * (sin_inc * sin_arg_tru),
         )
 
@@ -126,10 +122,17 @@ class Satellite(object):
             ((coords[0] * angular_momentum * self.eccentricity) / (radius * orbital_period)) * sin_tru -
             (angular_momentum / radius) * (cos_asc * sin_arg_tru + sin_asc * cos_arg_tru * cos_inc),
             ((coords[1] * angular_momentum * self.eccentricity) / (radius * orbital_period)) * sin_tru -
-            (angular_momentum / radius) * (sin_asc * sin_arg_tru + cos_asc * cos_arg_tru * cos_inc),
+            (angular_momentum / radius) * (sin_asc * sin_arg_tru - cos_asc * cos_arg_tru * cos_inc),
             ((coords[2] * angular_momentum * self.eccentricity) / (radius * orbital_period)) * sin_tru +
             (angular_momentum / radius) * (sin_inc * cos_arg_tru)
         )
+
+        vel = math.sqrt(EARTH_MU * (2/radius - 1/semi_major_axis))
+        r = math.sqrt(coords[0]**2 + coords[1]**2 + coords[2]**2)
+        v = math.sqrt(velocity[0]**2 + velocity[1]**2 + velocity[2]**2)
+
+        assert abs(radius - r) < MIN_PRECISION
+        assert abs(vel - v) < MIN_PRECISION
 
         a = velocity[0] + EARTH_ROTATION * coords[1]
         b = velocity[1] - EARTH_ROTATION * coords[0]
@@ -156,11 +159,17 @@ class Satellite(object):
         return latitude, longitude
 
 
-#sat_params = tle_to_params("1 27460U 02035A   16353.76973984 -.00000051  00000-0  00000+0 0  9996",
-#                           "2 27460   0.0395 354.2710 0006616 279.5515  86.0990  1.00272668 52981")
+sat_params = tle_to_params("1 27460U 02035A   16353.76973984 -.00000051  00000-0  00000+0 0  9996",
+                           "2 27460   0.0395 354.2710 0006616 279.5515  86.0990  1.00272668 52981")
 
-sat_params = tle_to_params("1 25544U 98067A   16358.18798762  .00001342  00000-0  27737-4 0  9991",
-                           "2 25544  51.6428 195.6612 0006387   5.3135 104.2861 15.53921298 34384")
+#sat_params = tle_to_params("1 25544U 98067A   16358.18798762  .00001342  00000-0  27737-4 0  9991",
+#                           "2 25544  51.6428 195.6612 0006387   5.3135 104.2861 15.53921298 34384")
+
+#sat_params = tle_to_params("1 07276U 74026A   16361.60125193  .00000194  00000-0  56065-3 0  9994",
+#                           "2 07276  62.7229 202.5803 6911586 286.6968  12.4802  2.45094949200390")
+
+#sat_params = tle_to_params("1 37158U 10045A   16359.31422074 -.00000086  00000-0  00000+0 0  9995",
+#                           "2 37158  40.7711 161.8701 0746301 269.9385 273.1385  1.00272864 23007")
 
 
 sat = Satellite(sat_params)
@@ -170,7 +179,7 @@ print(sat.predict(0))
 
 lats, lons = [], []
 
-for i in range(DAY):
+for i in range(DAY//2):
     lat, lon = sat.predict(i)
     lats.append(lat)
     lons.append(lon)
