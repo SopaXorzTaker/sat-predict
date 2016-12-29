@@ -106,6 +106,7 @@ class Satellite(object):
 
         angular_momentum = math.sqrt(EARTH_MU * semi_major_axis * (1 - self.eccentricity**2))
 
+        # from https://smallsats.org/2013/01/20/j2-propagator/
         ascension_change = -(1.5*EARTH_MU**0.5*EARTH_J2*EARTH_RADIUS**2/((1-self.eccentricity**2)*semi_major_axis**3.5))*math.cos(self.inclination*DEG_TO_RAD)
         argument_change = ascension_change*(2.5*math.sin(self.inclination*DEG_TO_RAD)**2 - 2) / math.cos(self.inclination*DEG_TO_RAD)
 
@@ -119,6 +120,7 @@ class Satellite(object):
         cos_asc, sin_asc = math.cos(current_ascension * DEG_TO_RAD), math.sin(current_ascension * DEG_TO_RAD)
         cos_tru, sin_tru = math.cos(true_anomaly * DEG_TO_RAD), math.sin(true_anomaly * DEG_TO_RAD)
 
+        # from http://ccar.colorado.edu/asen5070/handouts/kep2cart_2002.doc
         coords = (
             radius * (cos_asc * cos_arg_tru - sin_asc * sin_arg_tru * cos_inc),
             radius * (sin_asc * cos_arg_tru + cos_asc * sin_arg_tru * cos_inc),
