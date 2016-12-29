@@ -136,14 +136,6 @@ class Satellite(object):
             (angular_momentum / radius) * (sin_inc * cos_arg_tru)
         )
 
-        vel = math.sqrt(EARTH_MU * (2/radius - 1/semi_major_axis))
-        r = math.sqrt(coords[0]**2 + coords[1]**2 + coords[2]**2)
-        v = math.sqrt(velocity[0]**2 + velocity[1]**2 + velocity[2]**2)
-
-        assert abs(radius - r) < MIN_PRECISION
-        #assert abs(vel - v) < MIN_PRECISION
-        #print(vel, v)
-
         a = velocity[0] + EARTH_ROTATION * coords[1]
         b = velocity[1] - EARTH_ROTATION * coords[0]
 
