@@ -55,9 +55,10 @@ def ecef_to_coords(x, y, z):
     lat *= RAD_TO_DEG
     lon *= RAD_TO_DEG
 
+
     if lat < -90:
         lat += 180
-    if lat > 90:
+    elif lat > 90:
         lat -= 180
 
     return lat, lon
@@ -86,14 +87,19 @@ class Satellite(object):
 
         self.epoch_julian = julian_date(2000 + self.epoch_year, self.epoch_day - 1.0)
 
-    def predict(self, timestamp):
-        current_mean_motion = self.mean_motion + (timestamp / DAY * self.ballistic_coefficient * 2)
+    def predict(self, timestamp, last_timestamp=0.0, last_mean_motion=0.0, last_mean_anomaly=0.0, last_ascension=0.0, last_argument=0.0):
+        if last_timestamp == 0.0:
+            last_mean_motion, last_mean_anomaly, last_ascension, last_argument = self.mean_motion, self.mean_anomaly, self.ascension, self.argument_of_perigee
+
+        delta_t = timestamp - last_timestamp
+        current_mean_motion = last_mean_motion + (delta_t / DAY * self.ballistic_coefficient * 2)
         orbital_period = DAY / current_mean_motion
 
         semi_major_axis = (((orbital_period / (math.pi * 2)) ** 2) * EARTH_MU) ** (1 / 3)
+        semi_latus_rectum = semi_major_axis * (1 - self.eccentricity**2)
 
-        current_mean_anomaly = ((self.mean_anomaly * DEG_TO_RAD +
-                                 timestamp * math.sqrt(EARTH_MU / semi_major_axis ** 3)) * RAD_TO_DEG) % 360
+        current_mean_anomaly = ((last_mean_anomaly * DEG_TO_RAD +
+                                 delta_t * math.sqrt(EARTH_MU / semi_major_axis ** 3)) * RAD_TO_DEG) % 360
 
         eccentric_anomaly = find_eccentric_anomaly(current_mean_anomaly * DEG_TO_RAD, self.eccentricity) * RAD_TO_DEG
 
@@ -107,11 +113,11 @@ class Satellite(object):
         angular_momentum = math.sqrt(EARTH_MU * semi_major_axis * (1 - self.eccentricity**2))
 
         # from https://smallsats.org/2013/01/20/j2-propagator/
-        ascension_change = -(1.5*EARTH_MU**0.5*EARTH_J2*EARTH_RADIUS**2/((1-self.eccentricity**2)*semi_major_axis**3.5))*math.cos(self.inclination*DEG_TO_RAD)
+        ascension_change = -(1.5*EARTH_MU**0.5*EARTH_J2*EARTH_RADIUS**2/((1-self.eccentricity**2)*semi_major_axis**3.5))*math.cos(self.inclination*DEG_TO_RAD) * RAD_TO_DEG
         argument_change = ascension_change*(2.5*math.sin(self.inclination*DEG_TO_RAD)**2 - 2) / math.cos(self.inclination*DEG_TO_RAD)
 
-        current_ascension = self.ascension + ascension_change * timestamp
-        current_argument = self.argument_of_perigee + argument_change * timestamp
+        current_ascension = last_ascension + ascension_change * delta_t
+        current_argument = last_argument + argument_change * delta_t
 
         cos_arg_tru, sin_arg_tru = math.cos(current_argument * DEG_TO_RAD + true_anomaly * DEG_TO_RAD), \
             math.sin(current_argument * DEG_TO_RAD + true_anomaly * DEG_TO_RAD)
@@ -128,18 +134,18 @@ class Satellite(object):
         )
 
         velocity = (
-            ((coords[0] * angular_momentum * self.eccentricity) / (radius * orbital_period)) * sin_tru -
+            ((coords[0] * angular_momentum * self.eccentricity) / (radius * semi_latus_rectum)) * sin_tru -
             (angular_momentum / radius) * (cos_asc * sin_arg_tru + sin_asc * cos_arg_tru * cos_inc),
-            ((coords[1] * angular_momentum * self.eccentricity) / (radius * orbital_period)) * sin_tru -
+            ((coords[1] * angular_momentum * self.eccentricity) / (radius * semi_latus_rectum)) * sin_tru -
             (angular_momentum / radius) * (sin_asc * sin_arg_tru - cos_asc * cos_arg_tru * cos_inc),
-            ((coords[2] * angular_momentum * self.eccentricity) / (radius * orbital_period)) * sin_tru +
+            ((coords[2] * angular_momentum * self.eccentricity) / (radius * semi_latus_rectum)) * sin_tru +
             (angular_momentum / radius) * (sin_inc * cos_arg_tru)
         )
 
-        a = velocity[0] + EARTH_ROTATION * coords[1]
-        b = velocity[1] - EARTH_ROTATION * coords[0]
+        a = velocity[0] + EARTH_ROTATION/(math.pi*2) * coords[1]
+        b = velocity[1] - EARTH_ROTATION/(math.pi*2) * coords[0]
 
-        theta = jd_theta(self.epoch_julian + timestamp/DAY)
+        theta = jd_theta(self.epoch_julian + timestamp/DAY + 0.25)
 
         cos_theta, sin_theta = math.cos(theta), math.sin(theta)
         x = (a * cos_theta + b * sin_theta)
@@ -158,14 +164,14 @@ class Satellite(object):
 
         latitude, longitude = ecef_to_coords(x, y, z)
 
-        return latitude, longitude
+        return current_mean_motion, current_mean_anomaly, current_ascension, current_argument, latitude, longitude
 
 
-sat_params = tle_to_params("1 27460U 02035A   16353.76973984 -.00000051  00000-0  00000+0 0  9996",
-                           "2 27460   0.0395 354.2710 0006616 279.5515  86.0990  1.00272668 52981")
+#sat_params = tle_to_params("1 27460U 02035A   16353.76973984 -.00000051  00000-0  00000+0 0  9996",
+#                           "2 27460   0.0395 354.2710 0006616 279.5515  86.0990  1.00272668 52981")
 
-#sat_params = tle_to_params("1 25544U 98067A   16358.18798762  .00001342  00000-0  27737-4 0  9991",
-#                           "2 25544  51.6428 195.6612 0006387   5.3135 104.2861 15.53921298 34384")
+sat_params = tle_to_params("1 25544U 98067A   16358.18798762  .00001342  00000-0  27737-4 0  9991",
+                           "2 25544  51.6428 195.6612 0006387   5.3135 104.2861 15.53921298 34384")
 
 #sat_params = tle_to_params("1 07276U 74026A   16361.60125193  .00000194  00000-0  56065-3 0  9994",
 #                           "2 07276  62.7229 202.5803 6911586 286.6968  12.4802  2.45094949200390")
@@ -173,16 +179,20 @@ sat_params = tle_to_params("1 27460U 02035A   16353.76973984 -.00000051  00000-0
 #sat_params = tle_to_params("1 37158U 10045A   16359.31422074 -.00000086  00000-0  00000+0 0  9995",
 #                           "2 37158  40.7711 161.8701 0746301 269.9385 273.1385  1.00272864 23007")
 
+#sat_params = tle_to_params("1 33591U 09005A   16364.50642449  .00000064  00000-0  59538-4 0  9993",
+#                           "2 33591  99.0688 323.1466 0014603  32.6768 327.5304 14.12139775406705")
 
 sat = Satellite(sat_params)
-print(sat_params)
 
+print(sat_params)
 print(sat.predict(0))
 
 lats, lons = [], []
 
-for i in range(DAY//15):
-    lat, lon = sat.predict(i)
+m, ma, asc, arg = 0.0, 0.0, 0.0, 0.0
+
+for i in range(DAY):
+    m, ma, asc, arg, lat, lon = sat.predict(i+1, i, m, ma, asc, arg)
     lats.append(lat)
     lons.append(lon)
 
