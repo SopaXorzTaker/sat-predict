@@ -87,7 +87,6 @@ class Satellite(object):
         orbital_period = DAY / current_mean_motion
 
         semi_major_axis = (((orbital_period / (math.pi * 2)) ** 2) * EARTH_MU) ** (1 / 3)
-        semi_latus_rectum = semi_major_axis * (1 - self.eccentricity**2)
 
         current_mean_anomaly = ((last_mean_anomaly * DEG_TO_RAD +
                                  delta_t * math.sqrt(EARTH_MU / semi_major_axis ** 3)) * RAD_TO_DEG) % 360
