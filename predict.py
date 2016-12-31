@@ -55,16 +55,7 @@ def ecef_to_coords(x, y, z):
     lat *= RAD_TO_DEG
     lon *= RAD_TO_DEG
 
-
-    if lat < -90:
-        lat += 180
-    elif lat > 90:
-        lat -= 180
-
     return lat, lon
-
-#print(ecef_to_coords(-576793.17, -5376363.47, 3372298.51))
-#print("32.12345, -96.12345, 500.0")
 
 
 def find_eccentric_anomaly(mean_anomaly, eccentricity):
@@ -110,8 +101,6 @@ class Satellite(object):
         radius = (semi_major_axis * (1 - self.eccentricity**2)) /\
                  (1 + self.eccentricity * math.cos(true_anomaly * DEG_TO_RAD))
 
-        angular_momentum = math.sqrt(EARTH_MU * semi_major_axis * (1 - self.eccentricity**2))
-
         # from https://smallsats.org/2013/01/20/j2-propagator/
         ascension_change = -(1.5*EARTH_MU**0.5*EARTH_J2*EARTH_RADIUS**2/((1-self.eccentricity**2)*semi_major_axis**3.5))*math.cos(self.inclination*DEG_TO_RAD) * RAD_TO_DEG
         argument_change = ascension_change*(2.5*math.sin(self.inclination*DEG_TO_RAD)**2 - 2) / math.cos(self.inclination*DEG_TO_RAD)
@@ -124,33 +113,20 @@ class Satellite(object):
 
         cos_inc, sin_inc = math.cos(self.inclination * DEG_TO_RAD), math.sin(self.inclination * DEG_TO_RAD)
         cos_asc, sin_asc = math.cos(current_ascension * DEG_TO_RAD), math.sin(current_ascension * DEG_TO_RAD)
-        cos_tru, sin_tru = math.cos(true_anomaly * DEG_TO_RAD), math.sin(true_anomaly * DEG_TO_RAD)
 
         # from http://ccar.colorado.edu/asen5070/handouts/kep2cart_2002.doc
-        coords = (
+        position = (
             radius * (cos_asc * cos_arg_tru - sin_asc * sin_arg_tru * cos_inc),
             radius * (sin_asc * cos_arg_tru + cos_asc * sin_arg_tru * cos_inc),
             radius * (sin_inc * sin_arg_tru),
         )
 
-        velocity = (
-            ((coords[0] * angular_momentum * self.eccentricity) / (radius * semi_latus_rectum)) * sin_tru -
-            (angular_momentum / radius) * (cos_asc * sin_arg_tru + sin_asc * cos_arg_tru * cos_inc),
-            ((coords[1] * angular_momentum * self.eccentricity) / (radius * semi_latus_rectum)) * sin_tru -
-            (angular_momentum / radius) * (sin_asc * sin_arg_tru - cos_asc * cos_arg_tru * cos_inc),
-            ((coords[2] * angular_momentum * self.eccentricity) / (radius * semi_latus_rectum)) * sin_tru +
-            (angular_momentum / radius) * (sin_inc * cos_arg_tru)
-        )
-
-        a = velocity[0] + EARTH_ROTATION/(math.pi*2) * coords[1]
-        b = velocity[1] - EARTH_ROTATION/(math.pi*2) * coords[0]
-
-        theta = jd_theta(self.epoch_julian + timestamp/DAY + 0.25)
+        theta = jd_theta(self.epoch_julian + timestamp/DAY)
 
         cos_theta, sin_theta = math.cos(theta), math.sin(theta)
-        x = (a * cos_theta + b * sin_theta)
-        y = (a * (-sin_theta) + b * cos_theta)
-        z = velocity[2]
+        x = position[0]*cos_theta + position[1]*sin_theta
+        y = position[0]*-sin_theta + position[1]*cos_theta
+        z = position[2]
 
         """
                 ap_plus_pe = semi_major_axis * 2
